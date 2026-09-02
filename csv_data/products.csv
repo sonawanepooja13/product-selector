@@ -1,0 +1,9 @@
+﻿pump_current,num_pumps,num_vfd,bypass,panel_type,panel_size,panel_class,main_incomer,olr_required,indicator_light,price
+10.0,2,1,With Bypass,Indoor,600x400,Industrial,Yes,Yes,Yes,1250.00
+1,1,2,With Bypass,Indoor,400x300,Industrial,Yes,Yes,Yes,123.00
+5,1,1,With Bypass,Indoor,400x300,Industrial,Yes,Yes,Yes,123.00
+10,1,0,With Bypass,Indoor,400x300,Industrial,Yes,Yes,Yes,10.00
+12,1,0,With Bypass,Indoor,400x300,Industrial,Yes,Yes,Yes,123.00
+10,2,1,With Bypass,Indoor,400x300,Industrial,No,No,Yes,123456.00
+10,1,1,With Bypass,Indoor,400x300,Industrial,Yes,Yes,Yes,300.00
+10,1,1,With Bypass,Outdoor,400x300,Domestic,Yes,No,Yes,1230.00

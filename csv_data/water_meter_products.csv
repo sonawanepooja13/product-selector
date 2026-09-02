@@ -1,0 +1,2 @@
+﻿device_name,tank_height_position,solenoid_valve,sensor_type,communication_medium,meter_size,price
+Water Level Sensor,Overhead Tank,Yes,Float Sensor,LoRa,DN50,4200.00

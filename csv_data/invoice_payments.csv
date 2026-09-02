@@ -1,0 +1,3 @@
+payment_date,supplier,invoice_no,amount,payment_method
+2026-08-22,abc,123,120.00,Cheque
+2026-08-22,aa,345,25000.00,Cheque
