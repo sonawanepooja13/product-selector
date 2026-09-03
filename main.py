@@ -1400,6 +1400,18 @@ class MainApp:
 
         self.navigation_stack.clear()
 
+    def logout(self):
+
+        if self.content_frame:
+            self.content_frame.destroy()
+            self.content_frame = None
+
+        self.user_data = None
+        self.reset_navigation()
+        self.current_view = None
+        self.current_view_name = None
+        self.show_login_screen()
+
     # ===================================================================
     # STYLES
     # ===================================================================
@@ -2109,6 +2121,17 @@ class MainApp:
 
         banner.pack(
             fill="x"
+        )
+
+        ttk.Button(
+            banner,
+            text="Logout",
+            style="Ghost.TButton",
+            command=self.logout,
+        ).pack(
+            side="right",
+            padx=26,
+            pady=16,
         )
 
         tk.Label(
