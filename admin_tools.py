@@ -13,17 +13,11 @@ class UserAccessControlDialog(tk.Toplevel):
     def __init__(self, parent):
         super().__init__(parent)
         self.title("User Access & Permission Control")
-        self.geometry("520x680")
-        self.minsize(520, 500)
+        self.geometry("1100x650")
+        self.minsize(700, 500)
         self.resizable(True, True)
         self.transient(parent)
         self.grab_set()
-
-        # Make dialog fullscreen (maximized) for full screen user access control
-        try:
-            self.state('zoomed')
-        except Exception:
-            pass
 
         # Dynamically create permission variables for every permission header
         self.permission_vars = {
@@ -36,17 +30,51 @@ class UserAccessControlDialog(tk.Toplevel):
 
         self.setup_ui()
         self.load_accounts_dropdown()
+        self.update_idletasks()
+
+        screen_width = self.winfo_screenwidth()
+        width = min(1100, screen_width - 40)
+        height = 650
+        left = max((screen_width - width) // 2, 0)
+        top = 20
+        self.geometry(f"{width}x{height}+{left}+{top}")
 
     def setup_ui(self):
-        container = ttk.Frame(self, padding=20)
-        container.pack(fill="both", expand=True)
+        page_frame = ttk.Frame(self)
+        page_frame.pack(fill="both", expand=True)
+        page_frame.columnconfigure(0, weight=1)
+        page_frame.rowconfigure(0, weight=1)
+
+        page_canvas = tk.Canvas(page_frame, borderwidth=0, highlightthickness=0)
+        page_scrollbar = ttk.Scrollbar(
+            page_frame, orient="vertical", command=page_canvas.yview
+        )
+        page_canvas.grid(row=0, column=0, sticky="nsew")
+        page_scrollbar.grid(row=0, column=1, sticky="ns")
+        page_canvas.configure(yscrollcommand=page_scrollbar.set)
+        page_scrollbar.set(0.0, 1.0)
+
+        container = ttk.Frame(page_canvas, padding=20)
+        page_window = page_canvas.create_window((0, 0), window=container, anchor="nw")
+        container.bind(
+            "<Configure>",
+            lambda event: page_canvas.configure(
+                scrollregion=page_canvas.bbox("all")
+            ),
+        )
+        page_canvas.bind(
+            "<Configure>",
+            lambda event: page_canvas.itemconfigure(page_window, width=event.width),
+        )
+        container.columnconfigure(0, weight=1)
+        container.rowconfigure(5, weight=1)
 
         # Title Header
         ttk.Label(
             container,
             text="User Account & Tab Access Control",
             font=("Helvetica", 14, "bold"),
-        ).pack(pady=(0, 15))
+        ).grid(row=0, column=0, sticky="ew", pady=(0, 15))
 
         # ------------------------------------------------------------------
         # Top Section: Select Account to Modify
@@ -55,12 +83,12 @@ class UserAccessControlDialog(tk.Toplevel):
             container,
             text="Select Account to Modify:",
             font=("Helvetica", 9, "bold"),
-        ).pack(anchor="w", pady=(0, 4))
+        ).grid(row=1, column=0, sticky="w", pady=(0, 4))
 
         self.combo_accounts = ttk.Combobox(
             container, state="readonly", font=("Helvetica", 9)
         )
-        self.combo_accounts.pack(fill="x", pady=(0, 15))
+        self.combo_accounts.grid(row=2, column=0, sticky="ew", pady=(0, 15))
         self.combo_accounts.bind(
             "<<ComboboxSelected>>", self.on_account_selected
         )
@@ -71,7 +99,7 @@ class UserAccessControlDialog(tk.Toplevel):
         cred_frame = ttk.LabelFrame(
             container, text=" Account Credentials ", padding=12
         )
-        cred_frame.pack(fill="x", pady=(0, 15))
+        cred_frame.grid(row=3, column=0, sticky="ew", pady=(0, 15))
 
         # Username
         ttk.Label(cred_frame, text="Username:").pack(anchor="w", pady=(2, 2))
@@ -113,10 +141,12 @@ class UserAccessControlDialog(tk.Toplevel):
         perm_frame = ttk.LabelFrame(
             container, text=" Controlled Window / Tab Permissions ", padding=12
         )
-        perm_frame.pack(fill="both", expand=True, pady=(0, 15))
+        perm_frame.grid(row=5, column=0, sticky="nsew", pady=(0, 15))
+        perm_frame.columnconfigure(0, weight=1)
+        perm_frame.rowconfigure(1, weight=1)
 
         control_row = ttk.Frame(perm_frame)
-        control_row.pack(fill="x", pady=(0, 8))
+        control_row.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 8))
         ttk.Button(control_row, text="Open All", command=lambda: self.set_all_permissions(True)).pack(side="left", padx=(0, 5))
         ttk.Button(control_row, text="Close All", command=lambda: self.set_all_permissions(False)).pack(side="left", padx=5)
         ttk.Button(control_row, text="Default", command=self.reset_default_permissions).pack(side="left", padx=5)
@@ -130,8 +160,8 @@ class UserAccessControlDialog(tk.Toplevel):
         )
         perm_canvas.create_window((0, 0), window=perm_inner, anchor="nw")
         perm_canvas.configure(yscrollcommand=perm_scrollbar.set)
-        perm_canvas.pack(side="left", fill="both", expand=True)
-        perm_scrollbar.pack(side="right", fill="y")
+        perm_canvas.grid(row=1, column=0, sticky="nsew")
+        perm_scrollbar.grid(row=1, column=1, sticky="ns")
 
         groups = {}
         labels = getattr(auth_manager, 'WINDOW_PERMISSION_LABELS', {})
@@ -173,21 +203,20 @@ class UserAccessControlDialog(tk.Toplevel):
                     variable=self.permission_vars[perm],
                 ).grid(row=row, column=col, sticky="w", padx=8, pady=4)
 
-        # ------------------------------------------------------------------
-        # Bottom Action Buttons
-        # ------------------------------------------------------------------
-        btn_frame = ttk.Frame(container)
-        btn_frame.pack(fill="x", pady=(5, 0))
+            btn_frame = ttk.Frame(container)
+        btn_frame.grid(row=1, column=0, columnspan=2, sticky="ew")
+        btn_frame.columnconfigure(0, weight=1)
+        btn_frame.columnconfigure(1, weight=1)
 
         ttk.Button(
             btn_frame,
             text="Save / Apply Permissions",
             command=self.save_user_details,
-        ).pack(side="left", fill="x", expand=True, padx=(0, 5))
+        ).grid(row=0, column=0, sticky="ew", padx=(0, 5))
 
         ttk.Button(
             btn_frame, text="Delete User", command=self.delete_user_account
-        ).pack(side="right", fill="x", expand=True, padx=(5, 0))
+        ).grid(row=0, column=1, sticky="ew", padx=(5, 0))
 
     def load_accounts_dropdown(self):
         """Loads all accounts into dropdown displaying Name and Mobile Number."""

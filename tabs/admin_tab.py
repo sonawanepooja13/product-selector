@@ -14,8 +14,8 @@ class UserPermissionsWindow(tk.Toplevel):
     def __init__(self, parent, on_update_callback, selected_username=None):
         super().__init__(parent)
         self.title("User Access & Permission Control")
-        self.geometry("760x700")
-        self.minsize(650, 600)
+        self.geometry("1100x650")
+        self.minsize(700, 500)
         self.resizable(True, True)
         self.on_update_callback = on_update_callback
 
@@ -36,13 +36,7 @@ class UserPermissionsWindow(tk.Toplevel):
         }
 
         self.build_ui()
-        # Make the permission window fullscreen (maximized) for better visibility
-        try:
-            # On Windows and many platforms, 'zoomed' maximizes the window
-            self.state('zoomed')
-        except Exception:
-            # Fallback: center with large size
-            self.center_window()
+        self.center_window()
 
         if selected_username:
             self.combo_users.set(selected_username)
@@ -50,14 +44,38 @@ class UserPermissionsWindow(tk.Toplevel):
 
     def center_window(self):
         self.update_idletasks()
-        width, height = 760, 700
-        x = (self.winfo_screenwidth() // 2) - (width // 2)
-        y = (self.winfo_screenheight() // 2) - (height // 2)
+        width = min(1100, self.winfo_screenwidth() - 40)
+        height = min(650, self.winfo_screenheight() - 80)
+        x = (self.winfo_screenwidth() - width) // 2
+        y = max((self.winfo_screenheight() - height) // 2, 20)
         self.geometry(f"{width}x{height}+{x}+{y}")
 
     def build_ui(self):
-        frame = ttk.Frame(self, padding=20)
-        frame.pack(fill="both", expand=True)
+        page_frame = ttk.Frame(self)
+        page_frame.pack(fill="both", expand=True)
+        page_frame.columnconfigure(0, weight=1)
+        page_frame.rowconfigure(0, weight=1)
+
+        page_canvas = tk.Canvas(page_frame, borderwidth=0, highlightthickness=0)
+        page_scrollbar = ttk.Scrollbar(
+            page_frame, orient="vertical", command=page_canvas.yview
+        )
+        page_canvas.grid(row=0, column=0, sticky="nsew")
+        page_scrollbar.grid(row=0, column=1, sticky="ns")
+        page_canvas.configure(yscrollcommand=page_scrollbar.set)
+
+        frame = ttk.Frame(page_canvas, padding=20)
+        page_window = page_canvas.create_window((0, 0), window=frame, anchor="nw")
+        frame.bind(
+            "<Configure>",
+            lambda event: page_canvas.configure(
+                scrollregion=page_canvas.bbox("all")
+            ),
+        )
+        page_canvas.bind(
+            "<Configure>",
+            lambda event: page_canvas.itemconfigure(page_window, width=event.width),
+        )
 
         ttk.Label(
             frame,
