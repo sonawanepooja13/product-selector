@@ -1,0 +1,2 @@
+lot_id,po_no,material,supplier,supplier_batch,qty_received,qty_sampled,inspection_status,quality_status,inspector,created_on
+447a8141-bf4f-4cc7-9bc8-6178e4c320b5,9877563,raw material,pooja,A-812L,0,10,Under Review,HOLD,QA Engineer,2026-09-04 16:38:17

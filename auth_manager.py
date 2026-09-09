@@ -27,6 +27,7 @@ HEADERS = [
     "allow_panel_mfg",
     "allow_accounts",
     "allow_hr",
+    "allow_attendance",
     "allow_purchase",
     "allow_stores",
     "allow_maintenance",
@@ -67,6 +68,7 @@ WINDOW_PERMISSION_LABELS = {
     "allow_panel_mfg": "Panel Manufacturing",
     "allow_accounts": "Accounts & Finance",
     "allow_hr": "HR Module",
+    "allow_attendance": "Attendance",
     "allow_purchase": "Purchase / Procurement",
     "allow_stores": "Stores / Warehouse",
     "allow_maintenance": "Maintenance",
@@ -292,6 +294,6 @@ def log_to_purchase_order_excel(
         total_amount,
         remarks,
     ]
-
+    
     ws.append(row_data)
     wb.save(PO_EXCEL_FILE)

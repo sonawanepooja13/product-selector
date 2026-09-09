@@ -9,7 +9,6 @@ from tkinter import filedialog, messagebox, ttk
 import config
 from tkcalendar import DateEntry
 
-
 DEPARTMENTS = ("Production", "R&D", "Panel Department", "Office", "Sales", "Marketing", "HR", "Accounts", "Other")
 EMPLOYMENT_TYPES = ("Full-time", "Part-time", "Contractor", "Intern")
 
@@ -102,10 +101,8 @@ HR_TABS = (
     )),
 )
 
-
 def csv_path(register):
     return os.path.join(config.CSV_DIR, f"hr_{register}.csv")
-
 
 class HRRegisterTab(ttk.Frame):
     def __init__(self, parent, title, register, fields):
@@ -236,7 +233,6 @@ class HRRegisterTab(ttk.Frame):
         for key in ("created_at", "uploaded_at"):
             if key in self.vars:
                 self.vars[key].set(datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-
 
 class HRView(ttk.Frame):
     def __init__(self, parent, user_data=None):

@@ -1,0 +1,28 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Run Flutter App (Chrome Web)",
+            "cwd": "${workspaceFolder}/mobile_app",
+            "request": "launch",
+            "type": "dart",
+            "program": "lib/main.dart",
+            "deviceId": "chrome"
+        },
+        {
+            "name": "Run Flutter App (Android / Device)",
+            "cwd": "${workspaceFolder}/mobile_app",
+            "request": "launch",
+            "type": "dart",
+            "program": "lib/main.dart"
+        },
+        {
+            "name": "Run Flutter App (Windows Desktop)",
+            "cwd": "${workspaceFolder}/mobile_app",
+            "request": "launch",
+            "type": "dart",
+            "program": "lib/main.dart",
+            "deviceId": "windows"
+        }
+    ]
+}

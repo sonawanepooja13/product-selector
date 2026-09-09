@@ -8,6 +8,7 @@ import bom_engine
 import panel_manufacturing
 import production_window
 import hr_window
+import attendance_window
 from outward_window import OutwardWindow
 from vendor_registration import VendorRegistrationWindow
 import supply_chain_logistics
@@ -651,6 +652,7 @@ class UserAccessControlFrame(ttk.Frame):
             ("allow_panel_mfg", "🔧 Panel Manufacturing Module"),
             ("allow_accounts", "💰 Accounts & Finance Module"),
             ("allow_hr", "👥 HR (Human Resources) Module"),
+            ("allow_attendance", "🕘 Attendance Module"),
             ("allow_purchase", "🛒 Purchase / Procurement Module"),
             ("allow_stores", "📦 Stores / Warehouse Module"),
             ("allow_maintenance", "🛠️ Maintenance Module"),
@@ -2283,6 +2285,15 @@ class MainApp:
                 lambda: self.navigate_to(
                     self.show_hr_view,
                     view_name="Human Resources"
+                ),
+            ),
+
+            (
+                "allow_attendance",
+                "🕘 Attendance",
+                lambda: self.navigate_to(
+                    self.show_attendance_view,
+                    view_name="Attendance"
                 ),
             ),
 
@@ -4059,6 +4070,50 @@ class MainApp:
             messagebox.showerror(
                 "Error Loading View",
                 f"Could not load HR module:\n{e}",
+                parent=self.root,
+            )
+
+    def show_attendance_view(self):
+
+        if not self.user_has_permission(
+            "allow_attendance",
+            False
+        ):
+
+            messagebox.showwarning(
+                "Access Denied",
+                "You do not have permission to open Attendance.",
+                parent=self.root,
+            )
+            return
+
+        try:
+
+            self.clear_workspace()
+
+            self._set_current_view(
+                self.show_attendance_view,
+                view_name="Attendance"
+            )
+
+            self.create_back_header(
+                "Attendance",
+                self.go_back
+            )
+
+            attendance_window.AttendanceView(
+                self.content_frame,
+                user_data=self.user_data
+            ).pack(
+                fill="both",
+                expand=True
+            )
+
+        except Exception as e:
+
+            messagebox.showerror(
+                "Error Loading View",
+                f"Could not load Attendance module:\n{e}",
                 parent=self.root,
             )
 
