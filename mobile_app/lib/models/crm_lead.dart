@@ -65,4 +65,59 @@ class CrmLead {
       createdAt: createdAt ?? this.createdAt,
     );
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'client_name': clientName,
+      'company': company,
+      'phone': phone,
+      'email': email,
+      'category': category,
+      'estimated_value': estimatedValue,
+      'stage': stage.toString().split('.').last,
+      'notes': notes,
+      'created_at': createdAt.toIso8601String(),
+    };
+  }
+
+  factory CrmLead.fromJson(Map<String, dynamic> json) {
+    LeadStage parseStage(String? s) {
+      switch (s) {
+        case 'newLead':
+        case 'new_lead':
+        case 'New Lead':
+          return LeadStage.newLead;
+        case 'inDiscussion':
+        case 'in_discussion':
+        case 'In Discussion':
+          return LeadStage.inDiscussion;
+        case 'quotationSent':
+        case 'quotation_sent':
+        case 'Quotation Sent':
+          return LeadStage.quotationSent;
+        case 'won':
+        case 'Won':
+          return LeadStage.won;
+        case 'lost':
+        case 'Lost':
+          return LeadStage.lost;
+        default:
+          return LeadStage.newLead;
+      }
+    }
+
+    return CrmLead(
+      id: json['id']?.toString() ?? json['contact_id']?.toString() ?? '',
+      clientName: json['client_name']?.toString() ?? json['primary_contact']?.toString() ?? '',
+      company: json['company']?.toString() ?? json['company_name']?.toString() ?? '',
+      phone: json['phone']?.toString() ?? '',
+      email: json['email']?.toString() ?? '',
+      category: json['category']?.toString() ?? '',
+      estimatedValue: (json['estimated_value'] is num) ? (json['estimated_value'] as num).toDouble() : double.tryParse(json['estimated_value']?.toString() ?? '0') ?? 0.0,
+      stage: parseStage(json['stage']?.toString()),
+      notes: json['notes']?.toString() ?? '',
+      createdAt: DateTime.tryParse(json['created_at']?.toString() ?? '') ?? DateTime.now(),
+    );
+  }
 }

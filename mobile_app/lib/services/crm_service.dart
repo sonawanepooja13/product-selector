@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import '../models/crm_lead.dart';
+import 'backend.dart';
 
 class CrmService extends ChangeNotifier {
   static final CrmService _instance = CrmService._internal();
@@ -7,6 +8,7 @@ class CrmService extends ChangeNotifier {
 
   CrmService._internal() {
     _initInitialLeads();
+    _loadFromBackend();
   }
 
   final List<CrmLead> _leads = [];
@@ -54,8 +56,30 @@ class CrmService extends ChangeNotifier {
   }
 
   void addLead(CrmLead lead) {
-    _leads.insert(0, lead);
-    notifyListeners();
+    // Try to persist to backend first; fall back to local list on failure.
+    BackendClient.createContact(lead).then((resp) {
+      // If backend returns an id, use it; otherwise leave local id.
+      final newId = resp['id']?.toString() ?? resp['contact_id']?.toString();
+      final leadWithId = newId != null && newId.isNotEmpty ? lead.copyWith(id: newId) : lead;
+      _leads.insert(0, leadWithId);
+      notifyListeners();
+    }).catchError((_) {
+      _leads.insert(0, lead);
+      notifyListeners();
+    });
+  }
+
+  Future<void> _loadFromBackend() async {
+    try {
+      final backendLeads = await BackendClient.fetchContacts();
+      if (backendLeads.isNotEmpty) {
+        _leads.clear();
+        _leads.addAll(backendLeads);
+        notifyListeners();
+      }
+    } catch (_) {
+      // ignore backend failures; keep seeded local leads
+    }
   }
 
   void updateLeadStage(String leadId, LeadStage newStage) {

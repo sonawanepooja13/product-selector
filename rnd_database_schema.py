@@ -323,9 +323,17 @@ class ComplianceRecord(Base):
 # Database connection setup
 def get_database_url():
     """Returns database URL - can be configured for different databases"""
+    # Prefer environment DATABASE_URL (e.g., PostgreSQL/RDS). Fallback to local SQLite.
+    import os
+    db_url = os.environ.get('DATABASE_URL')
+    if db_url:
+        return db_url
     return "sqlite:///rnd_database.db"  # Default to SQLite for development
-    # For PostgreSQL: return "postgresql://user:password@localhost/rnd_database"
-    # For MySQL: return "mysql://user:password@localhost/rnd_database"
+
+
+    # Examples:
+    # For PostgreSQL: postgresql://user:password@localhost:5432/rnd_database
+    # For MySQL: mysql://user:password@localhost/rnd_database
 
 
 def create_engine_and_session():

@@ -6,7 +6,7 @@ Prerequisites
 
 Quick build (recommended)
 1. Open Command Prompt and change directory to the project root:
-   cd "D:\python code\porduct selector"
+   cd "D:\python code\product-selector"
 
 2. Run the provided batch script to create a venv, install build dependencies and produce a single-file executable:
    build_exe.bat

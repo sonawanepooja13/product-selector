@@ -4,7 +4,7 @@ Provides RESTful API endpoints for interlinked R&D modules with hardware depende
 and risk/compliance triggers for stage gates
 """
 
-from fastapi import FastAPI, HTTPException, Depends, status
+from fastapi import FastAPI, HTTPException, Depends, status, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy import create_engine, and_, or_
@@ -12,6 +12,11 @@ from typing import List, Optional, Dict, Any
 from datetime import datetime, date
 from pydantic import BaseModel, Field
 import uuid
+import sqlite3
+import os
+import asyncio
+import json
+from fastapi import APIRouter
 
 # Import database models
 from rnd_database_schema import (
@@ -41,6 +46,44 @@ app.add_middleware(
 engine = create_engine(get_database_url(), echo=False)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base.metadata.create_all(bind=engine)
+
+
+# --- WebSocket Connection Manager for real-time sync ---
+class ConnectionManager:
+    def __init__(self):
+        self.active_connections: List[WebSocket] = []
+
+    async def connect(self, websocket: WebSocket):
+        await websocket.accept()
+        self.active_connections.append(websocket)
+
+    def disconnect(self, websocket: WebSocket):
+        if websocket in self.active_connections:
+            self.active_connections.remove(websocket)
+
+    async def send_personal_message(self, message: str, websocket: WebSocket):
+        await websocket.send_text(message)
+
+    async def broadcast(self, message: str):
+        # send concurrently to avoid blocking
+        coros = [ws.send_text(message) for ws in list(self.active_connections)]
+        if not coros:
+            return
+        await asyncio.gather(*coros, return_exceptions=True)
+
+
+manager = ConnectionManager()
+
+
+@app.websocket('/ws/crm')
+async def crm_websocket_endpoint(websocket: WebSocket):
+    await manager.connect(websocket)
+    try:
+        while True:
+            # Keep connection open; optionally receive pings
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        manager.disconnect(websocket)
 
 
 # Dependency to get database session
@@ -551,3 +594,74 @@ def advance_product_stage(product_id: str, db: Session = Depends(get_db)):
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
+
+
+# --- Lightweight CRM endpoints (SQLite-backed) to support desktop compatibility ---
+crm_db_path = os.path.join(os.path.dirname(__file__), "crm_database.db")
+
+
+def _crm_conn():
+    conn = sqlite3.connect(crm_db_path)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
+@app.get("/api/v1/crm/contacts")
+def api_get_contacts():
+    conn = _crm_conn()
+    cur = conn.cursor()
+    cur.execute("SELECT id, company_name, primary_contact, email, phone, status, lead_score, created_at FROM contacts ORDER BY created_at DESC")
+    rows = [dict(r) for r in cur.fetchall()]
+    conn.close()
+    return rows
+
+
+@app.post("/api/v1/crm/contacts")
+def api_create_contact(payload: dict):
+    conn = _crm_conn()
+    cur = conn.cursor()
+    cur.execute(
+        "INSERT INTO contacts (company_name, primary_contact, email, phone, status, lead_score, created_at) VALUES (?, ?, ?, ?, ?, ?, datetime('now'))",
+        (payload.get("company_name"), payload.get("primary_contact"), payload.get("email"), payload.get("phone"), payload.get("status", "New"), payload.get("lead_score", 0))
+    )
+    conn.commit()
+    new_id = cur.lastrowid
+    conn.close()
+    # Broadcast to connected WebSocket clients about new contact (fire-and-forget)
+    try:
+        event = {"type": "crm:contact_created", "payload": {"id": new_id, **payload}}
+        asyncio.create_task(manager.broadcast(json.dumps(event)))
+    except Exception:
+        pass
+    return {"id": new_id}
+
+
+@app.post("/api/v1/crm/interactions")
+def api_log_interaction(payload: dict):
+    conn = _crm_conn()
+    cur = conn.cursor()
+    cur.execute("INSERT INTO interactions (contact_id, type, summary, logged_at) VALUES (?, ?, ?, datetime('now'))",
+                (payload.get("contact_id"), payload.get("type"), payload.get("summary")))
+    conn.commit()
+    conn.close()
+    # Broadcast interaction event
+    try:
+        event = {"type": "crm:interaction_logged", "payload": payload}
+        asyncio.create_task(manager.broadcast(json.dumps(event)))
+    except Exception:
+        pass
+    return {"success": True}
+
+
+@app.get("/api/v1/crm/metrics")
+def api_crm_metrics():
+    conn = _crm_conn()
+    cur = conn.cursor()
+    cur.execute("SELECT COALESCE(SUM(deal_value),0) as total_pipeline_value FROM deals")
+    total_value = cur.fetchone()[0]
+    cur.execute("SELECT COUNT(*) FROM contacts WHERE status != 'Lost'")
+    active_leads = cur.fetchone()[0]
+    cur.execute("SELECT COUNT(*) FROM tasks WHERE is_completed = 0")
+    pending_tasks = cur.fetchone()[0]
+    conn.close()
+    return {"total_pipeline_value": total_value, "active_leads": active_leads, "pending_tasks": pending_tasks}

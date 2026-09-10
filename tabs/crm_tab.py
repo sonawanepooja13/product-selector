@@ -8,6 +8,7 @@ import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
 import config
+import crm_engine
 
 # Try importing tkcalendar; fallback to manual input if not available
 try:
@@ -130,6 +131,10 @@ class CrmTab(ttk.Frame):
 
         self.ensure_crm_csv_exists()
         self.migrate_and_align_csv()
+
+        # If backend API is configured, prefer backend data and enable realtime updates
+        self.use_backend = bool(getattr(crm_engine, 'BACKEND_API_URL', None))
+        self._ws_listener_started = False
 
         self.setup_scrollable_container()
         self.build_ui()
@@ -726,6 +731,14 @@ class CrmTab(ttk.Frame):
         ).pack(side="left", padx=2)
 
         self.load_crm_data()
+
+        # Start websocket listener once if backend is used
+        if self.use_backend and not self._ws_listener_started:
+            try:
+                crm_engine.start_crm_ws_listener(on_event=lambda ev: self.after(100, self.load_crm_data))
+                self._ws_listener_started = True
+            except Exception:
+                pass
 
     def show_crm_management(self):
         """Show the CRM management view."""
@@ -1502,11 +1515,35 @@ class CrmTab(ttk.Frame):
             self.crm_tree.selection_remove(self.crm_tree.selection())
 
     def load_crm_data(self):
+        # If backend configured, fetch contacts from backend API
         self.all_rows = []
+        expected_count = len(self.get_crm_headers())
+
+        if self.use_backend:
+            try:
+                contacts = crm_engine.fetch_all_contacts()
+                # crm_engine.fetch_all_contacts may return list of dicts (when using backend)
+                for c in contacts:
+                    # Map known fields into CSV-row format
+                    row = [""] * expected_count
+                    row[0] = c.get("company_name") or c.get("company") or ""
+                    row[2] = c.get("primary_contact") or c.get("contact_person") or ""
+                    row[5] = c.get("phone") or c.get("contact_number") or ""
+                    row[11] = c.get("owner_name") or c.get("owner") or ""
+                    row[14] = str(c.get("estimated_value", ""))
+                    row[15] = c.get("note") or c.get("notes") or ""
+                    # created_at -> meeting_time or call_time depending on UI mapping
+                    row[20] = c.get("created_at") or ""
+                    self.all_rows.append(row)
+                self.populate_tree(self.all_rows)
+                return
+            except Exception:
+                # Fall back to CSV if backend fetch fails
+                pass
+
+        # Default: load from CSV file
         if not os.path.exists(self.crm_csv_path):
             return
-
-        expected_count = len(self.get_crm_headers())
 
         try:
             with open(
