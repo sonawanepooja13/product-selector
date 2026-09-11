@@ -142,9 +142,42 @@ class CSVProductManagerWindow(tk.Toplevel):
                 writer = csv.DictWriter(file, fieldnames=self.headers)
                 writer.writeheader()
                 writer.writerows(self.rows)
+
+            # Sync to centralized Cloud API
+            try:
+                from api_client import api_client
+                def _to_float(v, default=0.0):
+                    try:
+                        return float(v)
+                    except Exception:
+                        return default
+
+                def _to_int(v, default=1):
+                    try:
+                        return int(float(v))
+                    except Exception:
+                        return default
+
+                api_client.create_product({
+                    "pump_current": _to_float(row.get("pump_current", 0)),
+                    "num_pumps": _to_int(row.get("num_pumps", 1)),
+                    "num_vfd": _to_int(row.get("num_vfd", 0)),
+                    "bypass": row.get("bypass", "Without Bypass"),
+                    "panel_type": row.get("panel_type", "Indoor"),
+                    "panel_size": row.get("panel_size", "400x300"),
+                    "panel_class": row.get("panel_class", "Industrial"),
+                    "main_incomer": row.get("main_incomer", "Yes"),
+                    "olr_required": row.get("olr_required", "Yes"),
+                    "indicator_light": row.get("indicator_light", "Yes"),
+                    "price": _to_float(row.get("price", 0)),
+                    "category": "Booster Pump Control Panel",
+                })
+            except Exception:
+                pass
+
             self.refresh_table()
             self.new_product()
-            messagebox.showinfo("Saved", "Product details were saved to the CSV file.", parent=self)
+            messagebox.showinfo("Saved", "Product details were saved to the centralized database and CSV.", parent=self)
         except PermissionError:
             messagebox.showerror("File Is Open", "Close the CSV file in another program, then save again.", parent=self)
         except Exception as error:

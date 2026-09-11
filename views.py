@@ -190,6 +190,17 @@ class AddCustomerWindow(tk.Toplevel):
             writer = csv.writer(file)
             writer.writerows(existing_rows)
 
+        # Sync to centralized Cloud API
+        try:
+            from api_client import api_client
+            api_client.create_customer({
+                "name": name,
+                "percentage": pct_value,
+                "category": "Standard",
+            })
+        except Exception:
+            pass
+
         messagebox.showinfo("Saved", f"Customer '{name}' saved successfully.", parent=self)
         if self.callback:
             self.callback()

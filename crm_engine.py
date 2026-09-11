@@ -8,8 +8,8 @@ import time
 
 DB_FILE = os.path.join(os.path.dirname(__file__), "crm_database.db")
 
-# Optional: backend API configuration. If set, crm_engine will proxy calls to the FastAPI backend.
-BACKEND_API_URL = os.getenv("BACKEND_API_URL")  # e.g. https://api.example.com
+# Backend API configuration. Defaults to centralized server.
+BACKEND_API_URL = os.getenv("BACKEND_API_URL", "http://127.0.0.1:8000")
 BACKEND_API_TOKEN = os.getenv("BACKEND_API_TOKEN")
 
 
@@ -21,8 +21,15 @@ def get_db():
 
 def _api_headers():
     headers = {"Content-Type": "application/json"}
-    if BACKEND_API_TOKEN:
-        headers["Authorization"] = f"Bearer {BACKEND_API_TOKEN}"
+    token = BACKEND_API_TOKEN
+    if not token:
+        try:
+            from api_client import api_client
+            token = api_client.access_token
+        except Exception:
+            token = None
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
     return headers
 
 

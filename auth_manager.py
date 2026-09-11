@@ -137,7 +137,34 @@ def ensure_user_file_exists():
 
 
 def load_users():
-    """Reads all users, their profiles, and permissions from CSV."""
+    """Reads all users, their profiles, and permissions from API (fallback to CSV)."""
+    # 1. Try centralized backend API first
+    try:
+        from api_client import api_client
+        if api_client.is_online():
+            api_users = api_client.get_users()
+            if api_users:
+                # Format users matching desktop schema
+                formatted = []
+                for u in api_users:
+                    user_dict = {
+                        "username": u.get("username", ""),
+                        "password_hash": "",
+                        "full_name": u.get("full_name", ""),
+                        "mobile_number": u.get("mobile_number", ""),
+                        "designation": u.get("designation", ""),
+                        "role": u.get("role", "User"),
+                        "account_status": u.get("account_status", "Active"),
+                    }
+                    perms = u.get("permissions", {})
+                    for h in PERMISSION_HEADERS:
+                        user_dict[h] = bool(perms.get(h, False))
+                    formatted.append(user_dict)
+                return formatted
+    except Exception:
+        pass
+
+    # 2. Local CSV fallback
     if not os.path.exists(USERS_FILE):
         ensure_user_file_exists()
 
@@ -184,7 +211,20 @@ def save_users(users_list):
 
 
 def verify_login(username, password):
-    """Verifies credentials and returns user record if valid."""
+    """Verifies credentials via central API with local fallback."""
+    # 1. Try centralized backend API first
+    try:
+        from api_client import api_client
+        if api_client.login(username, password):
+            user = dict(api_client.current_user)
+            perms = user.get("permissions", {})
+            for h in PERMISSION_HEADERS:
+                user[h] = bool(perms.get(h, False))
+            return True, user
+    except Exception:
+        pass
+
+    # 2. Local CSV fallback
     users = load_users()
     pwd_hash = hash_password(password)
 
@@ -205,6 +245,25 @@ def add_or_update_user(
     **kwargs
 ):
     """Adds a new user or updates credentials, profile info, and dynamic permissions via kwargs."""
+    # 1. Send to central backend API
+    try:
+        from api_client import api_client
+        perms_dict = {h: kwargs.get(h, False) for h in PERMISSION_HEADERS}
+        api_payload = {
+            "username": username,
+            "password": password or "",
+            "full_name": full_name,
+            "mobile_number": mobile_number,
+            "designation": designation,
+            "role": role,
+            "account_status": "Active",
+            "permissions": perms_dict,
+        }
+        api_client.create_or_update_user(api_payload)
+    except Exception:
+        pass
+
+    # 2. Update local CSV
     users = load_users()
     updated = False
 
@@ -246,6 +305,14 @@ def add_or_update_user(
 
 def delete_user(username):
     """Deletes a user account by username."""
+    # 1. Delete on central backend API
+    try:
+        from api_client import api_client
+        api_client.delete_user(username)
+    except Exception:
+        pass
+
+    # 2. Delete in local CSV
     users = load_users()
     users = [u for u in users if u["username"] != username]
     save_users(users)

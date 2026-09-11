@@ -1,9 +1,9 @@
+import os
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from app.core.config import settings
 
-# Handle SQLite vs PostgreSQL URL requirements
 connect_args = {}
 if settings.DATABASE_URL.startswith("sqlite"):
     connect_args = {"check_same_thread": False}
@@ -25,3 +25,9 @@ def get_db():
         yield db
     finally:
         db.close()
+
+
+def init_db():
+    """Creates all database tables defined in models."""
+    from app.db import models  # noqa: F401
+    Base.metadata.create_all(bind=engine)

@@ -11,8 +11,9 @@ class RndScreen extends StatelessWidget {
     final auth = AuthService();
     final user = auth.currentUser;
 
+    // Removed 'const' keyword here
     final ecos = [
-      const EcoChangeOrder(
+      EcoChangeOrder(
         ecoNumber: 'ECO-2026-001',
         title: 'Upgrade SMPS 24V 2.5A to Din-Rail 5A unit for HMI Stability',
         proposedBy: 'Priya Sharma (R&D Lead)',
@@ -20,7 +21,7 @@ class RndScreen extends StatelessWidget {
         status: EcoStatus.inReview,
         date: DateTime.utc(2026, 8, 20),
       ),
-      const EcoChangeOrder(
+      EcoChangeOrder(
         ecoNumber: 'ECO-2026-002',
         title: 'Standardize RS485 Modbus Cable Gland Position on IP55 Door',
         proposedBy: 'Rajesh Kumar (Mfg)',
@@ -118,4 +119,4 @@ class RndScreen extends StatelessWidget {
       ),
     );
   }
-}
+} 

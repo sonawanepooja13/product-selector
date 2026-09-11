@@ -9,6 +9,7 @@ class CrmService extends ChangeNotifier {
   CrmService._internal() {
     _initInitialLeads();
     _loadFromBackend();
+    _subscribeToLiveEvents();
   }
 
   final List<CrmLead> _leads = [];
@@ -17,7 +18,7 @@ class CrmService extends ChangeNotifier {
   void _initInitialLeads() {
     _leads.addAll([
       CrmLead(
-        id: 'LEAD-101',
+        id: '1',
         clientName: 'Apex Water Works',
         company: 'Apex Infrastructure Ltd',
         phone: '+91 98201 12345',
@@ -29,7 +30,7 @@ class CrmService extends ChangeNotifier {
         createdAt: DateTime.now().subtract(const Duration(days: 3)),
       ),
       CrmLead(
-        id: 'LEAD-102',
+        id: '2',
         clientName: 'GreenTech STP Services',
         company: 'GreenTech Eco Solutions',
         phone: '+91 99870 54321',
@@ -41,7 +42,7 @@ class CrmService extends ChangeNotifier {
         createdAt: DateTime.now().subtract(const Duration(days: 7)),
       ),
       CrmLead(
-        id: 'LEAD-103',
+        id: '3',
         clientName: 'BlueSky Residential Complex',
         company: 'BlueSky Realty Developers',
         phone: '+91 91234 88776',
@@ -55,18 +56,29 @@ class CrmService extends ChangeNotifier {
     ]);
   }
 
-  void addLead(CrmLead lead) {
-    // Try to persist to backend first; fall back to local list on failure.
-    BackendClient.createContact(lead).then((resp) {
-      // If backend returns an id, use it; otherwise leave local id.
-      final newId = resp['id']?.toString() ?? resp['contact_id']?.toString();
-      final leadWithId = newId != null && newId.isNotEmpty ? lead.copyWith(id: newId) : lead;
-      _leads.insert(0, leadWithId);
-      notifyListeners();
-    }).catchError((_) {
-      _leads.insert(0, lead);
-      notifyListeners();
+  void _subscribeToLiveEvents() {
+    BackendClient.addEventListener((event) {
+      if (event['entity'] == 'crm') {
+        _loadFromBackend();
+      }
     });
+  }
+
+  void addLead(CrmLead lead) {
+    _leads.insert(0, lead);
+    notifyListeners();
+
+    // Persist to centralized cloud API
+    BackendClient.createContact(lead).then((resp) {
+      final newId = resp['id']?.toString() ?? resp['contact_id']?.toString();
+      if (newId != null && newId.isNotEmpty) {
+        final idx = _leads.indexOf(lead);
+        if (idx != -1) {
+          _leads[idx] = lead.copyWith(id: newId);
+          notifyListeners();
+        }
+      }
+    }).catchError((_) {});
   }
 
   Future<void> _loadFromBackend() async {
@@ -77,16 +89,30 @@ class CrmService extends ChangeNotifier {
         _leads.addAll(backendLeads);
         notifyListeners();
       }
-    } catch (_) {
-      // ignore backend failures; keep seeded local leads
-    }
+    } catch (_) {}
   }
 
   void updateLeadStage(String leadId, LeadStage newStage) {
     final idx = _leads.indexWhere((l) => l.id == leadId);
     if (idx != -1) {
-      _leads[idx] = _leads[idx].copyWith(stage: newStage);
+      final updated = _leads[idx].copyWith(stage: newStage);
+      _leads[idx] = updated;
       notifyListeners();
+
+      final numId = int.tryParse(leadId);
+      if (numId != null) {
+        BackendClient.updateContact(numId, updated).catchError((_) => false);
+      }
+    }
+  }
+
+  void deleteLead(String leadId) {
+    _leads.removeWhere((l) => l.id == leadId);
+    notifyListeners();
+
+    final numId = int.tryParse(leadId);
+    if (numId != null) {
+      BackendClient.deleteContact(numId).catchError((_) => false);
     }
   }
 

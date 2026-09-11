@@ -1,0 +1,43 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database (replicates AWS RDS PostgreSQL locally)
+  db:
+    image: postgres:15-alpine
+    container_name: saark_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: saark_admin
+      POSTGRES_PASSWORD: saark_secure_password_2026
+      POSTGRES_DB: saark_cloud_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U saark_admin -d saark_cloud_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # FastAPI Backend Service (replicates AWS ECS / EC2 container)
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: saark_api_server
+    restart: always
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PROJECT_NAME: "Saark Operating System API"
+      API_V1_STR: "/api/v1"
+      SECRET_KEY: "change_this_to_a_random_secure_key_for_production"
+      DATABASE_URL: "postgresql://saark_admin:saark_secure_password_2026@db:5432/saark_cloud_db"
+      CORS_ORIGINS: "*"
+    ports:
+      - "8000:8000"
+
+volumes:
+  postgres_data:

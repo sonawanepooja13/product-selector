@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import '../models/user_model.dart';
+import 'backend.dart';
 
 class AuthService extends ChangeNotifier {
   static final AuthService _instance = AuthService._internal();
@@ -17,7 +18,6 @@ class AuthService extends ChangeNotifier {
   List<UserModel> get allUsers => List.unmodifiable(_users);
 
   void _initDefaultUsers() {
-    // Admin user matching auth_manager.py
     final adminPerms = UserModel.defaultPermissions();
     adminPerms.updateAll((key, val) => true);
 
@@ -31,7 +31,6 @@ class AuthService extends ChangeNotifier {
       permissions: adminPerms,
     );
 
-    // Standard User matching auth_manager.py defaults
     final userPerms = UserModel.defaultPermissions();
     userPerms['allow_price'] = true;
     userPerms['allow_material'] = true;
@@ -52,7 +51,39 @@ class AuthService extends ChangeNotifier {
     _users.addAll([adminUser, standardUser]);
   }
 
+  Future<bool> loginAsync(String username, String password) async {
+    try {
+      final res = await BackendClient.login(username, password);
+      final userData = res['user'] as Map<String, dynamic>;
+      final rawPerms = (userData['permissions'] as Map<String, dynamic>?) ?? {};
+      final perms = UserModel.defaultPermissions();
+      rawPerms.forEach((k, v) {
+        if (perms.containsKey(k)) {
+          perms[k] = v == true;
+        }
+      });
+      _currentUser = UserModel(
+        username: userData['username']?.toString() ?? username,
+        password: password,
+        fullName: userData['full_name']?.toString() ?? '',
+        mobileNumber: userData['mobile_number']?.toString() ?? '',
+        designation: userData['designation']?.toString() ?? '',
+        role: userData['role']?.toString() ?? 'User',
+        permissions: perms,
+      );
+      notifyListeners();
+      return true;
+    } catch (_) {
+      // Offline fallback
+      return loginSync(username, password);
+    }
+  }
+
   bool login(String username, String password) {
+    return loginSync(username, password);
+  }
+
+  bool loginSync(String username, String password) {
     try {
       final user = _users.firstWhere(
         (u) =>
@@ -69,6 +100,7 @@ class AuthService extends ChangeNotifier {
 
   void logout() {
     _currentUser = null;
+    BackendClient.setAuthToken(null);
     notifyListeners();
   }
 
@@ -91,7 +123,7 @@ class AuthService extends ChangeNotifier {
   }
 
   bool deleteUser(String username) {
-    if (username == 'admin') return false; // Prevent deleting master admin
+    if (username == 'admin') return false;
     _users.removeWhere((u) => u.username == username);
     notifyListeners();
     return true;

@@ -27,6 +27,19 @@ class PriceTab(ttk.Frame):
         self.refresh_customer_list()
         self._bind_configuration_events()
 
+        # Connect live real-time sync with AWS/Centralized Backend
+        try:
+            from api_client import api_client
+            def _on_ws_event(event):
+                if event.get("entity") in ("customer", "product"):
+                    try:
+                        self.after(0, self.refresh_customer_list)
+                    except Exception:
+                        pass
+            api_client.register_event_listener(_on_ws_event)
+        except Exception:
+            pass
+
     def build_ui(self):
         if self.product_category == "STP Panel":
             title_text = "STP Panel Price Lookup"
@@ -294,6 +307,33 @@ class PriceTab(ttk.Frame):
         CSVProductManagerWindow(self.winfo_toplevel())
 
     def refresh_customer_list(self):
+        # 1. Try centralized backend API first
+        api_loaded = False
+        try:
+            from api_client import api_client
+            if api_client.is_online():
+                customers = api_client.get_customers()
+                if customers:
+                    self.customer_data = {}
+                    names = []
+                    for c in customers:
+                        name = c.get("name")
+                        pct = float(c.get("percentage", 0.0) or 0.0)
+                        if name:
+                            self.customer_data[name] = pct
+                            names.append(name)
+                    if names:
+                        self.customer_combo["values"] = names
+                        if not self.customer_combo.get() or self.customer_combo.get() not in names:
+                            self.customer_combo.current(0)
+                        api_loaded = True
+        except Exception:
+            pass
+
+        if api_loaded:
+            return
+
+        # 2. Local CSV fallback
         customers = bom_engine.read_csv_data(self.customers_csv_path)
         self.customer_data = {}
         names = []
@@ -336,31 +376,56 @@ class PriceTab(ttk.Frame):
             self.validation_error_label.config(text="Pump Current must be a valid number in format like 12.5 or 25.", foreground="red")
             return
 
-        def flexible_normalize(val):
-            if val is None:
-                return ""
-            s = str(val).strip().lower()
-            if s.endswith(".0"):
-                s = s[:-2]
-            
-            if s in ["1", "true", "yes", "with bypass", "with_bypass", "withbypass"]:
-                return "yes_or_with"
-            if s in ["0", "false", "no", "without bypass", "without_bypass", "withoutbypass"]:
-                return "no_or_without"
-            
-            return re.sub(r"[^a-z0-9]", "", s)
-
-        num_pumps = flexible_normalize(self.pumps_combo.get())
-        num_vfd = flexible_normalize(self.vfd_combo.get())
-        bypass = flexible_normalize(self.bypass_combo.get())
-        panel_type = flexible_normalize(self.panel_type_combo.get())
-        panel_size = flexible_normalize(self.size_combo.get())
-        panel_class = flexible_normalize(self.panel_class_combo.get())
-        main_incomer = flexible_normalize(self.main_incomer_combo.get())
-        olr_required = flexible_normalize(self.olr_combo.get())
-        indicator_light = flexible_normalize(self.light_combo.get())
-
         found_base_price = None
+
+        # 1. Query Centralized Cloud API first
+        try:
+            from api_client import api_client
+            if api_client.is_online():
+                search_query = {
+                    "pump_current": pump_current,
+                    "num_pumps": int(self.pumps_combo.get() or 1),
+                    "num_vfd": int(self.vfd_combo.get() or 0),
+                    "bypass": self.bypass_combo.get() or "Without Bypass",
+                    "panel_type": self.panel_type_combo.get() or "Indoor",
+                    "panel_size": self.size_combo.get() or "400x300",
+                    "panel_class": self.panel_class_combo.get() or "Industrial",
+                    "main_incomer": self.main_incomer_combo.get() or "Yes",
+                    "olr_required": self.olr_combo.get() or "Yes",
+                    "indicator_light": self.light_combo.get() or "Yes",
+                    "category": self.product_category,
+                }
+                api_res = api_client.search_product_price(search_query, customer_name=self.customer_combo.get())
+                if api_res and api_res.get("found"):
+                    found_base_price = float(api_res.get("base_price", 0.0))
+        except Exception:
+            pass
+
+        # 2. Local CSV Search Fallback
+        if found_base_price is None:
+            def flexible_normalize(val):
+                if val is None:
+                    return ""
+                s = str(val).strip().lower()
+                if s.endswith(".0"):
+                    s = s[:-2]
+                
+                if s in ["1", "true", "yes", "with bypass", "with_bypass", "withbypass"]:
+                    return "yes_or_with"
+                if s in ["0", "false", "no", "without bypass", "without_bypass", "withoutbypass"]:
+                    return "no_or_without"
+                
+                return re.sub(r"[^a-z0-9]", "", s)
+
+            num_pumps = flexible_normalize(self.pumps_combo.get())
+            num_vfd = flexible_normalize(self.vfd_combo.get())
+            bypass = flexible_normalize(self.bypass_combo.get())
+            panel_type = flexible_normalize(self.panel_type_combo.get())
+            panel_size = flexible_normalize(self.size_combo.get())
+            panel_class = flexible_normalize(self.panel_class_combo.get())
+            main_incomer = flexible_normalize(self.main_incomer_combo.get())
+            olr_required = flexible_normalize(self.olr_combo.get())
+            indicator_light = flexible_normalize(self.light_combo.get())
 
         if os.path.exists(self.products_csv_path):
             try:

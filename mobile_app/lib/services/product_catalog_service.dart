@@ -1,5 +1,7 @@
+import 'package:flutter/foundation.dart';
 import '../models/product_configuration.dart';
 import 'bom_calculation_engine.dart';
+import 'backend.dart';
 
 class ProductSearchResult {
   final bool isFound;
@@ -17,13 +19,16 @@ class ProductSearchResult {
   });
 }
 
-class ProductCatalogService {
+class ProductCatalogService extends ChangeNotifier {
   // Singleton pattern for centralized mobile state
   static final ProductCatalogService _instance =
       ProductCatalogService._internal();
   factory ProductCatalogService() => _instance;
+
   ProductCatalogService._internal() {
     _initDefaults();
+    loadFromBackend();
+    _subscribeToLiveEvents();
   }
 
   late List<ProductConfiguration> _products;
@@ -97,6 +102,33 @@ class ProductCatalogService {
     _catalogItems = List.from(BomCalculationEngine.defaultCatalog);
   }
 
+  void _subscribeToLiveEvents() {
+    BackendClient.addEventListener((event) {
+      final entity = event['entity']?.toString();
+      if (entity == 'product' || entity == 'customer') {
+        loadFromBackend();
+      }
+    });
+  }
+
+  Future<void> loadFromBackend() async {
+    try {
+      final prods = await BackendClient.fetchProducts();
+      if (prods.isNotEmpty) {
+        _products = prods;
+        notifyListeners();
+      }
+    } catch (_) {}
+
+    try {
+      final custs = await BackendClient.fetchCustomers();
+      if (custs.isNotEmpty) {
+        _customers = custs;
+        notifyListeners();
+      }
+    } catch (_) {}
+  }
+
   List<ProductConfiguration> get products => List.unmodifiable(_products);
   List<Customer> get customers => List.unmodifiable(_customers);
   List<CatalogItem> get catalogItems => List.unmodifiable(_catalogItems);
@@ -157,13 +189,32 @@ class ProductCatalogService {
 
   void addProduct(ProductConfiguration config) {
     _products.insert(0, config);
+    notifyListeners();
+
+    // Persist to centralized cloud API
+    BackendClient.createProduct(config).then((created) {
+      final idx = _products.indexOf(config);
+      if (idx != -1) {
+        _products[idx] = created;
+      }
+    }).catchError((_) {});
   }
 
   void addCustomer(Customer customer) {
     _customers.add(customer);
+    notifyListeners();
+
+    // Persist to centralized cloud API
+    BackendClient.createCustomer(customer).then((created) {
+      final idx = _customers.indexOf(customer);
+      if (idx != -1) {
+        _customers[idx] = created;
+      }
+    }).catchError((_) {});
   }
 
   void addCatalogItem(CatalogItem item) {
     _catalogItems.insert(0, item);
+    notifyListeners();
   }
 }
